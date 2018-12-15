@@ -1,0 +1,68 @@
+
+Running node-supervisor with
+  program 'bin/www'
+  --watch '.'
+  --extensions 'node,js'
+  --exec 'node'
+
+Starting child process with 'node bin/www'
+Watching directory '/usr/local/test1' for changes.
+Press rs for restarting the process.
+Parent process exiting, terminating child...
+events.js:141
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: EBADF: bad file descriptor, read
+    at Error (native)
+
+Running node-supervisor with
+  program 'bin/www'
+  --watch '.'
+  --extensions 'node,js'
+  --exec 'node'
+
+Starting child process with 'node bin/www'
+Watching directory '/usr/local/test1' for changes.
+Press rs for restarting the process.
+Parent process exiting, terminating child...
+events.js:141
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: EBADF: bad file descriptor, read
+    at Error (native)
+
+Running node-supervisor with
+  program 'bin/www'
+  --watch '.'
+  --extensions 'node,js'
+  --exec 'node'
+
+Starting child process with 'node bin/www'
+Watching directory '/usr/local/test1' for changes.
+Press rs for restarting the process.
+Parent process exiting, terminating child...
+events.js:141
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: EBADF: bad file descriptor, read
+    at Error (native)
+
+Running node-supervisor with
+  program 'bin/www'
+  --watch '.'
+  --extensions 'node,js'
+  --exec 'node'
+
+Starting child process with 'node bin/www'
+Watching directory '/usr/local/test1' for changes.
+Press rs for restarting the process.
+Parent process exiting, terminating child...
+events.js:141
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: EBADF: bad file descriptor, read
+    at Error (native)
