@@ -41,7 +41,57 @@ var vote = {}
 var hasS = {}
 var score = {}
 var scoreNum = 0;
-	
+
+const voteMsgBit = 0;
+const scoreMsgBit = 1;
+const bonusMsgBit = 2;
+const msgArray = ['voteMsg', 'scoreMsg', 'bonusMsg'];
+
+var oldMsg = 0;
+var obj={};
+Object.defineProperty(obj,'message',{
+    get:function(){
+        return message;
+    },
+    set:function(newValue){
+        message = newValue;
+        console.log('set :', oldMsg, "--->", newValue);
+        //需要触发的渲染函数可以写在这...
+	var res = (oldMsg ^ newValue) & newValue;
+	for (var i = 0; i < 3; ++i) {
+		if (res >> i == 1) msgWss.clients.forEach(function (client) {
+					if (msgClients.indexOf(client.id) != -1) 
+						client.send(msgArray[i]);
+				   });
+
+	}
+	oldMsg = newValue;
+    }
+})
+
+obj.message = 0;
+/*
+Object.defineProperty(obj,'data',{
+    get:function(){
+        return obj.data;
+    },
+    set:function(newValue){
+	var oldValue = obj.data;
+        data = newValue;
+        console.log('set :', newValue);
+        var res = (oldValue ^ newValue) & newValue;
+	for (var i = 0; i < 3; ++i) {
+		if (res >> i == 1) msgWss.clients.forEach(function (client) {
+					if (msgClients.indexOf(client.id) != -1) 
+						client.send(msgArray[i]);
+				   });
+
+	}
+    }
+});
+
+obj.data = 0;
+*/
 httpsServer.listen(sslport, function() {
     console.log('https server is running on: https://localhost:%s', sslport);
 });
@@ -81,7 +131,7 @@ app.post('/giveScore', function(req, res) {
 		scoreNum++;
 		console.log("giveSocre  receive: %s", body);
 		try {
-			body = querystring.parse(body);
+			body = JSON.parse(body);
 			var conferenceID = body.conferenceID;
 			for (var i = 0; i < body.contents.length; ++i) {
 				var value = score[conferenceID]['contents'][i]['value'];
@@ -180,7 +230,17 @@ app.ws('/bullet', function(ws, res) {
 	});
 });
 
-
+var msgWss = expressWs.getWss('/message');
+var msgClients = [];
+app.ws('/message', function(ws, res) {
+	if (ws.id === undefined) ws.id = getUniqueID();
+	msgClients.push(ws.id);
+	console.log("message client: ", ws.id);
+	ws.on('close', function(msg) {
+		console.log("message wss closed");
+		msgClients.splice(msgClients.indexOf(ws.id));
+	})
+}); 
 
 app.ws('/setScore', function(ws, res) {
 	ws.on('message', function(msg) {
@@ -190,17 +250,21 @@ app.ws('/setScore', function(ws, res) {
 
 			score[req.conferenceID] = req;
 			hasS[req.conferenceID] = true;
+			obj.message |= (1 << scoreMsgBit);
+			console.log('msg', obj.message);
 			var avg = 0.0;
 			setTimeout(function() {
 				console.log("send to client: ", JSON.stringify(score[req.conferenceID]));
 				ws.send(JSON.stringify(score[req.conferenceID]));
 				score[req.conferenceID] = {};
 				scoreNum = 0;
+				obj.message &= ~(1 << scoreMsgBit);
+				
 				hasS[req.conferenceID] = false;
 			}, 20000);
 			
 		} catch(err) {
-			ws.send("set score error!");
+			console.log("err: ", err);
 		}
 	});
 	ws.on('close', function() {
@@ -216,6 +280,7 @@ app.ws('/setVote', function(ws, res) {
 			var req = JSON.parse(msg);
 			vote[req.conferenceID] = req;
 			hasV[req.conferenceID] = true;
+			obj.message |= (1 << voteMsgBit);
 			var rounds = 0;
 			var interval = setInterval(function() {
 				rounds++;
@@ -223,6 +288,7 @@ app.ws('/setVote', function(ws, res) {
 				if(rounds >= 20) {
 					vote[req.conferenceID] = {};
 					hasV[req.conferenceID] = false;
+					obj.message &= ~(1 << voteMsgBit);
 					clearInterval(interval);
 				}
 			}, 1000);
@@ -239,18 +305,22 @@ app.ws('/setBonus', function(ws, res) {
 			console.log("receive setBonus: ", msg);
 			bonus[req.conferenceID] = req;
 			hasB[req.conferenceID] = true;
+			obj.message |= (1 << bonusMsgBit);
 			setTimeout(function() {
 				console.log("send bonus to client"); 
 				var ret = pickOneBonus(req.conferenceID);
 				if (ret == 0) {
 					console.log("bonus sent: ", JSON.stringify(bonus[req.conferenceID]));
 					ws.send(JSON.stringify(bonus[req.conferenceID]));
-					bonus[req.conferenceID] = {}
-					hasB[req.conferenceID] = false;
-					bonusPool[req.conferenceID] = {};
+					
+					
 				} else {
 					console.log("error: pick one!");
 				}
+				bonus[req.conferenceID] = {}
+				hasB[req.conferenceID] = false;
+				bonusPool[req.conferenceID] = [];
+				obj.message &= ~(1 << bonusMsgBit);
 	
 			}, 10000);
 		}
@@ -270,13 +340,18 @@ app.post('/pickBonus', function(req, res) {
 	
 	req.on('end', function() {
 		console.log("pickBonus receive: %s", body);
-		body = querystring.parse(body);
+		body = JSON.parse(body);
 		//bonus[body.conferencdID] = body;
+		console.log("cID: ",body.conferenceID);
 		if (hasB[body.conferenceID]) {
+			console.log("hasB");
 			if (bonusPool[body.conferenceID] === undefined) bonusPool[body.conferenceID] = [];
 			bonusPool[body.conferenceID].push(body.userID);
+			res.status(200).send("success");
 		}
-		res.status(200).send("success");
+		else {
+			res.status(200).send("There is  no bonus at the moment");
+		}
 		res.end();
 
 	});
