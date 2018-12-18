@@ -23,6 +23,13 @@ var app = express();
 var httpsServer = https.createServer(credentials, app);
 var expressWs = expressWs(app, httpsServer);
 
+app.all('*', function(req, res, next) {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "X-Requested-With,Content-Type");
+    res.header("Access-Control-Allow-Methods","PUT,POST,GET,DELETE,OPTIONS");
+    next();
+});
+
 //var wss = require('express-ws')(app, httpsServer);
 var port = 18080;
 var sslport = 18081;
@@ -46,6 +53,28 @@ const voteMsgBit = 0;
 const scoreMsgBit = 1;
 const bonusMsgBit = 2;
 const msgArray = ['voteMsg', 'scoreMsg', 'bonusMsg'];
+
+var prevBulletNum = 0;
+var bulletNum = 0;
+var bulletStat ={time: [], stat: []};
+var bulletRound = 0;
+
+setInterval(function() {
+	bulletRound++;
+	var time = Date.now();
+	var date = new Date(time);
+	console.log(date);
+	bulletStat.time.push(date);
+	bulletStat.stat.push(bulletNum - prevBulletNum);
+	prevBulletNum = bulletNum;
+	if (bulletRound >= 576) {
+		bulletNum = 0;
+		prevBulletNum = 0;
+		bulletStat.stat = [];
+		bulletStat.time = [];
+		bulletRound = 0;
+	}
+}, 30000);
 
 var oldMsg = 0;
 var obj={};
@@ -151,6 +180,7 @@ app.get('/hasScore', function(req, res) {
 	var params = url.parse(req.url, true).query;
 	var conferenceID = params.conferenceID;
 	if (hasS[conferenceID]) {
+		console.log("hasScore: ", conferenceID);
 		res.status(200).send(JSON.stringify(score[conferenceID]));
 	} else {
 		res.status(200).send('');
@@ -162,7 +192,6 @@ app.get('/hasScore', function(req, res) {
 //conferenceID
 app.get('/hasBonus', function(req, res) {
 	var params = url.parse(req.url, true).query;
-	var userID = params.userID;
 	var conferenceID = params.conferenceID;
 	if (hasB[conferenceID]) {
 		res.status(200).send(JSON.stringify(bonus[conferenceID]));
@@ -218,6 +247,8 @@ app.ws('/bullet', function(ws, res) {
 	bulletClients.push(ws.id);
 	ws.on('message', function(msg) {
 		try {
+			bulletNum++;
+			console.log("bullet++", bulletNum);
 			bulletWss.clients.forEach(function (client) {
 				if (bulletClients.indexOf(client.id) != -1) 
 					client.send(msg);
@@ -356,6 +387,13 @@ app.post('/pickBonus', function(req, res) {
 
 	});
 });
+
+app.get('/bulletstat', function(req, res) {
+	//	res.status(200).send("ghehe");
+		
+		res.status(200).send(JSON.stringify({time: bulletStat.time.slice(bulletStat.time.length - 12), stat: bulletStat.stat.slice(bulletStat.stat.length - 12)}));
+ 
+});
 /*
 app.post('/setbonus', function setbonus(req, res) {
 	var body = '';
@@ -472,4 +510,5 @@ app.use(function(err, req, res, next) {
   res.status(err.status || 500);
   res.render('error');
 });
+
 
