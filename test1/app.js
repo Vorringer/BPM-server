@@ -56,25 +56,52 @@ const msgArray = ['voteMsg', 'scoreMsg', 'bonusMsg'];
 
 var prevBulletNum = 0;
 var bulletNum = 0;
-var bulletStat ={time: [], stat: []};
+var bulletStat ={time: ["2018-12-20T11:54:24.641Z","2018-12-20T11:59:24.641Z","2018-12-20T12:04:24.641Z","2018-12-20T12:09:24.641Z","2018-12-20T12:14:24.641Z","2018-12-20T12:19:24.641Z","2018-12-20T12:24:24.641Z","2018-12-20T12:29:24.641Z","2018-12-20T12:34:24.641Z","2018-12-20T12:39:24.641Z","2018-12-20T12:44:24.641Z","2018-12-20T12:49:24.641Z","2018-12-20T12:54:24.641Z","2018-12-20T12:59:24.641Z",], stat: [0,0,0,0,0,0,0,13,23,56,121,22,45,89], hot: [0,0,0,0,0,0,0,0,0,0,0,0,0,2]};
 var bulletRound = 0;
+
+var dataSet = [{center: 0,data:[0]},{center: 50,data:[50]},{center: 100,data:[100]}];
+
+var cal_dis = function(v1, v2) {
+	return (v1 - v2) * (v1 - v2);
+}
+
+var process_data = function(value) {
+	
+	var tmp = [cal_dis(value, dataSet[0].center),
+		cal_dis(value, dataSet[1].center),
+		cal_dis(value, dataSet[2].center)];
+	var min = tmp[0];
+	var index = 0;
+	if (tmp[1] < min) index = 1;
+	if (tmp[2] < min) index = 2;
+	dataSet[index].data.push(value);
+	dataSet[index].center = (dataSet[index].center * (dataSet[index].data.length - 1) + value) / dataSet[index].data.length;
+	return index;
+}
 
 setInterval(function() {
 	bulletRound++;
 	var time = Date.now();
 	var date = new Date(time);
 	console.log(date);
+	
 	bulletStat.time.push(date);
 	bulletStat.stat.push(bulletNum - prevBulletNum);
+	bulletStat.hot.push(process_data(bulletNum - prevBulletNum));
+	console.log("bullet num: ", bulletStat.stat.length);
 	prevBulletNum = bulletNum;
-	if (bulletRound >= 576) {
+	if (bulletRound % 576 == 0) {
 		bulletNum = 0;
 		prevBulletNum = 0;
 		bulletStat.stat = [];
 		bulletStat.time = [];
-		bulletRound = 0;
+		bulletStat.hot = [];
 	}
-}, 30000);
+	if (bulletRound >= 1152) {
+		bulletRound = 0;
+		dataSet = [{center: 0,data:[0]},{center: 50,data:[50]},{center: 100,data:[100]}];
+	}
+}, 600000);
 
 var oldMsg = 0;
 var obj={};
@@ -147,6 +174,13 @@ app.get('/', function(req, res) {
     else {
         res.status(200).send('welcome!');
     }
+});
+
+app.get('/myBonus', function(req, res) {
+	var params = url.parse(req.url, true).query;
+	var conferenceID = params.conferenceID;
+
+	res.send(bonus[conferenceID]['userID']);
 });
 
 //conferenceID score
@@ -313,18 +347,20 @@ app.ws('/setVote', function(ws, res) {
 			hasV[req.conferenceID] = true;
 			obj.message |= (1 << voteMsgBit);
 			var rounds = 0;
-			var interval = setInterval(function() {
-				rounds++;
-				ws.send(JSON.stringify(vote[req.conferenceID]));
-				if(rounds >= 20) {
-					vote[req.conferenceID] = {};
-					hasV[req.conferenceID] = false;
-					obj.message &= ~(1 << voteMsgBit);
-					clearInterval(interval);
-				}
-			}, 1000);
+			setTimeout(function() {
+				var interval = setInterval(function() {
+					rounds++;
+					ws.send(JSON.stringify(vote[req.conferenceID]));
+					if(rounds >= 20) {
+						vote[req.conferenceID] = {};
+						hasV[req.conferenceID] = false;
+						obj.message &= ~(1 << voteMsgBit);
+						clearInterval(interval);
+					}
+				}, 1000);
+			}, 5000);
 		} catch(err) {
-			ws.send("");
+			console.log("error in set Vote");
 		}
 	});
 });
@@ -334,6 +370,7 @@ app.ws('/setBonus', function(ws, res) {
 		try {
 			var req = JSON.parse(msg);
 			console.log("receive setBonus: ", msg);
+			bonus[req.conferenceID] = {};
 			bonus[req.conferenceID] = req;
 			hasB[req.conferenceID] = true;
 			obj.message |= (1 << bonusMsgBit);
@@ -348,7 +385,7 @@ app.ws('/setBonus', function(ws, res) {
 				} else {
 					console.log("error: pick one!");
 				}
-				bonus[req.conferenceID] = {}
+				//bonus[req.conferenceID] = {}
 				hasB[req.conferenceID] = false;
 				bonusPool[req.conferenceID] = [];
 				obj.message &= ~(1 << bonusMsgBit);
@@ -391,7 +428,7 @@ app.post('/pickBonus', function(req, res) {
 app.get('/bulletstat', function(req, res) {
 	//	res.status(200).send("ghehe");
 		
-		res.status(200).send(JSON.stringify({time: bulletStat.time.slice(bulletStat.time.length - 12), stat: bulletStat.stat.slice(bulletStat.stat.length - 12)}));
+		res.status(200).send(JSON.stringify({time: bulletStat.time.slice(bulletStat.time.length - 12), stat: bulletStat.stat.slice(bulletStat.stat.length - 12), hot: bulletStat.hot.slice(bulletStat.hot.length - 12)}));
  
 });
 /*
